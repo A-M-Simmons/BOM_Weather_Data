@@ -1,0 +1,3 @@
+136, Rainfall
+122, Temperature
+193, Solar Exposure
