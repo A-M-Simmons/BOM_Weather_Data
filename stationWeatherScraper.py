@@ -1,19 +1,17 @@
 import requests
 from urllib.request import Request, urlopen
-import shutil
-import zipfile
-from io import BytesIO
 import os
-import subprocess
-from multiprocessing import Pool, TimeoutError
+import shutil
 import pandas as pd
+import numpy as np
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import scoped_session
 from sqlalchemy.sql import select 
 import threading
-import numpy as np
-
+from extractZip import extractZip
+from database_models import connectToDatabase
+from database_models import Rainfall as Rainfall_table
 
 def getPC(stationID, ObsCode):
     r = requests.get(f"http://www.bom.gov.au/jsp/ncc/cdio/weatherData/av?p_stn_num={stationID}&p_display_type=availableYears&p_nccObsCode={ObsCode}")
@@ -37,9 +35,7 @@ def getData(stationID, ObsCode):
         # Copy zip file 
         shutil.copyfileobj(response, out_file)
     out_file.close()
-    path_7zip = "\"C:\\Program Files (x86)\\7-Zip\\7z.exe\""
-    cmd = f"{path_7zip} e {file_name} -odata/{ObsCode}/"
-    #sp = subprocess.Popen(cmd, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+    extractZip(file_name, f"./data/{ObsCode}/")
     return
 
 def insertData(Session, stationID, ObsCode):
@@ -65,9 +61,10 @@ def insertData(Session, stationID, ObsCode):
         data['Quality'] = data['Quality'].map({'Y': 1, 'N': 0})
         data['Date'] = pd.to_datetime(data.Year*10000+data.Month*100+data.Day,format='%Y%m%d')
 
-    numThreads = 120
+    numThreads = 80
     threads = []
     rowsToInsert = getRowsNotAlreadyInTable(data, current_Dates)
+    rowsToInsert = getRowsAfterDate(rowsToInsert, '2017-01-01')
     rowsToInsert = np.array_split(rowsToInsert, numThreads)
     # Create new threads
     for i in range(0, numThreads):
@@ -75,6 +72,7 @@ def insertData(Session, stationID, ObsCode):
     
     
     # Start new Threads
+    print("Uploading Data")
     for i in range(0, numThreads):
         threads[i].start()
         
@@ -104,16 +102,30 @@ def batchInsertRainfaillData(Session, stationID, rowsToInsert):
             batcher = 0
             session.commit()
     session.commit()
+    session.close()
 
 def getRowsNotAlreadyInTable(data_table, current_Dates):
     return data_table.loc[~data_table.Date.isin(current_Dates), :]
 
-from database_models import connectToDatabase
-from database_models import Rainfall as Rainfall_table
-conn_engine = connectToDatabase()
-session_factory = sessionmaker(bind=conn_engine)
-Session = scoped_session(session_factory)
+def getRowsAfterDate(df, date):
+    return df[(df['Date'] >= date)]
 
+def bulkUpload(nccObsCode):
+    conn_engine = connectToDatabase()
+    session_factory = sessionmaker(bind=conn_engine)
+    Session = scoped_session(session_factory)
 
-nccObsCode = "136"
-insertData(Session, 1006, nccObsCode)
+    # Get StationIDs
+    from database_models import Station as Station_table
+    session = Session()
+
+    siteIDs = []
+    for row in session.execute(select([Station_table.Site])):
+        siteIDs.append(row[0])
+
+    for id in siteIDs:
+        print(f"Station ID {id}")
+        insertData(Session, id, nccObsCode)
+
+if __name__ == "__main__":
+    bulkUpload("136")
