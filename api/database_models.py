@@ -1,9 +1,15 @@
-from sqlalchemy import Table, Column, Integer, String, Date, Boolean, Float, MetaData, create_engine
+from sqlalchemy import Table
+from sqlalchemy import Column
+from sqlalchemy import Integer
+from sqlalchemy import String
+from sqlalchemy import Date
+from sqlalchemy import Boolean
+from sqlalchemy import Float
+from sqlalchemy import MetaData
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import scoped_session
 from sqlalchemy.ext.declarative import declarative_base
-import sqlalchemy
-import os 
 from geopy import distance
 
 Base = declarative_base()
@@ -15,9 +21,11 @@ class Location:
         ''' Constructor '''
         self.lat = lat
         self.lon = lon
-    
+
     def withinRange(self, l, range):
-        return distance.distance((self.lat, self.lon), (l.lat, l.lon)).km < range
+        d = distance.distance((self.lat, self.lon), (l.lat, l.lon)).km
+        return d < range
+
 
 class Station(Base):
     __tablename__ = 'station'
@@ -33,7 +41,17 @@ class Station(Base):
     AWS = Column(Integer)
 
     def __repr__(self):
-       return "<Station(Site='%s', Name='%s', Lat='%s', Lon='%s', Start_date='%s', End_date='%s', Years='%s', Percentage='%s', AWS='%s')>" % (self.Site, self.Name, self.Lat, self.Lon, self.Start_date, self.End_date, self.Years, self.Percentage, self.AWS)
+        string = f"<Station(Site='{self.Site}',\
+                   + Name='{self.Name}',\
+                   + Lat='{self.Lat}',\
+                   + Lon='{self.Lon}',\
+                   + Start_date='{self.Start_date}',\
+                   + End_date='{self.End_date}',\
+                   + Years='{self.Years}',\
+                   + Percentage='{self.Percentage}',\
+                   + AWS='{self.AWS}')>"
+        return string
+
 
 class Rainfall(Base):
     __tablename__ = 'rainfall'
@@ -45,7 +63,13 @@ class Rainfall(Base):
     Quality = Column(Integer)
 
     def __repr__(self):
-       return "<Station(Site='%s', Date='%s', Rainfall='%s', Period='%s', Quality='%s')>" % (self.Site, self.Date, self.Rainfall, self.Period, self.Quality)
+        string = f"<Station(Site='{self.Site}',\
+            + Date='{self.Date}',\
+            + Rainfall='{self.Rainfall}',\
+            + Period='{self.Period}',\
+            + Quality='{self.Quality}')>"
+        return String
+
 
 class Solar(Base):
     __tablename__ = 'solar'
@@ -57,7 +81,13 @@ class Solar(Base):
     Quality = Column(Integer)
 
     def __repr__(self):
-       return "<Station(Site='%s', Date='%s', Solar='%s', Period='%s', Quality='%s')>" % (self.Site, self.Date, self.Solar, self.Period, self.Quality)
+        string = f"<Station(Site='{self.Site}',\
+                    + Date='{self.Date}',\
+                    + Rainfall='{self.Solar}',\
+                    + Solar='{self.Period}',\
+                    + Quality='{self.Quality}')>"
+        return string
+
 
 class Temperature(Base):
     __tablename__ = 'temperature'
@@ -69,41 +99,13 @@ class Temperature(Base):
     Quality = Column(Integer)
 
     def __repr__(self):
-       return "<Station(Site='%s', Date='%s', Temperature='%s', Period='%s', Quality='%s')>" % (self.Site, self.Date, self.Temperature, self.Period, self.Quality)
+        string = f"<Station(Site='{self.Site}',\
+                + Date='{self.Date}',\
+                + Temperature='{self.Temperature}',\
+                + Solar='{self.Period}',\
+                + Quality='{self.Quality}')>"
+        return string
 
-def connectToDatabaseThreading():
-    server = 'bomweatherdata.database.windows.net'
-    database = 'Weather_Data'
-    username = os.environ['BOM_RAINFALL_USERNAME']
-    password = os.environ['BOM_RAINFALL_PASSWORD']
-    driver= 'ODBC Driver 17 for SQL Server'  
-
-    connection_string = f"mssql+pyodbc://{username}:{password}@{server}:1433/{database}?driver={driver}"
-    #print(connection_string)
-    engine = sqlalchemy.engine.create_engine(connection_string, pool_size=128)
-    engine.connect()
-    session_factory = sessionmaker(bind=engine)
-    Session = scoped_session(session_factory)
-    return Session
-
-   
-
-def connectToDatabase():
-    server = 'bomweatherdata.database.windows.net'
-    database = 'Weather_Data'
-    username = os.environ['BOM_RAINFALL_USERNAME']
-    password = os.environ['BOM_RAINFALL_PASSWORD']
-    driver= 'ODBC Driver 17 for SQL Server'
-
-    connection_string = f"mssql+pyodbc://{username}:{password}@{server}:1433/{database}?driver={driver}"
-    #print(connection_string)
-    engine = sqlalchemy.engine.create_engine(connection_string, pool_size=128)
-    engine.connect()
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    return session
-
-
-def initTables():  
-    engine = connectToDatabase()
-    Base.metadata.create_all(engine)
+# def initTables():
+#    engine = connectToDatabase()
+#    Base.metadata.create_all(engine)

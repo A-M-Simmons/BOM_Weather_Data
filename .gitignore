@@ -1,3 +1,6 @@
 data/
 database/
 __pycache__/
+py37-venv/
+.venv/
+.env

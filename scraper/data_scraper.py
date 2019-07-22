@@ -1,24 +1,32 @@
+from urllib.request import Request
+from urllib.request import urlopen
+from multiprocessing import Pool
+from multiprocessing import TimeoutError
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import scoped_session
+from sqlalchemy.sql import select
+from api.database_models import Station as Station_table
+from io import BytesIO
 import requests
-from urllib.request import Request, urlopen
 import shutil
 import zipfile
-from io import BytesIO
 import os
 import subprocess
-from multiprocessing import Pool, TimeoutError
 import sqlite3
 import pandas as pd
 import numpy as np
-import pyodbc
-import sqlalchemy
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.orm import scoped_session
-from sqlalchemy.sql import select 
-from api.database_models import Station as Station_table
-from api import connectToDatabaseThreading
 import threading
 
+from api import connectToDatabaseThreading
+
+
 def convertDate(date):
+    """Convert Date found in StationList files into a usable string.
+
+    Keyword arguments:
+    date -- String with a three letter month followed by 4 digit year. \
+        e.g. "Jan 2019"
+    """
     date = date.split()
     mon = date[0]
     year = date[1]
@@ -47,28 +55,74 @@ def convertDate(date):
     elif mon == "Dec":
         return f"{year}-12-01"
 
+
 class StationList:
+    """Simple wrapper to store a list of `Station`
+    """
     def __init__(self, ObsCode):
+        """Initialise `StationList` with the ncc Observation Code.
+
+        Keyword arguments:
+        ObsCode -- int that designates the observation type.
+            136: Rainfall
+            122: Temperature
+            193: Solar Exposure
+        """
         self.list = []
         self.dict = {}
         self.ObsCode = ObsCode
-    
+
     def append(self, station):
+        """Appends `Station` into `StationList`
+
+        Keyword arguments:
+        station -- `Station`
+        """
         self.list.append(station)
-        self.dict[int(station.stationID)] = (station.name, station.latitude, station.longitude, convertDate(station.start), convertDate(station.end), station.years, station.percentage, station.automaticWeatherStation)
+        self.dict[int(station.stationID)] = (station.name,
+                                             station.latitude,
+                                             station.longitude,
+                                             convertDate(station.start),
+                                             convertDate(station.end),
+                                             station.years,
+                                             station.percentage,
+                                             station.automaticWeatherStation)
 
     def save(self, dir):
-        with open(f'{dir}/{self.ObsCode}.csv', 'w') as f:  
+        """Saves `StationList` to a csv file
+
+        Keyword arguments:
+        dir -- filepath to store csv
+        """
+        with open(f'{dir}/{self.ObsCode}.csv', 'w') as f:
             for s in self.list:
                 f.write(s.getLineEntry())
             f.close()
 
     def getPD(self):
-        data_table = pd.DataFrame.from_dict(self.dict, orient='index', columns=['Name', 'Lat', 'Lon', 'Start_date', 'End_date', 'Years', 'Percentage', 'AWS'])
+        """Convert `StationList` into a Pandas dataframe.
+
+        Column names: ['Name', 'Lat', 'Lon', 'Start_date', \
+            'End_date', 'Years', 'Percentage', 'AWS']
+        """
+        data_table = pd.DataFrame.from_dict(self.dict,
+                                            orient='index',
+                                            columns=['Name',
+                                                     'Lat',
+                                                     'Lon',
+                                                     'Start_date',
+                                                     'End_date',
+                                                     'Years',
+                                                     'Percentage',
+                                                     'AWS'])
         return(data_table)
 
+
 class Station:
-    def __init__(self, stationID, name, latitude, longitude, start, end, years, percentage, automaticWeatherStation):
+    def __init__(self, stationID, name, latitude,
+                 longitude, start, end, years, percentage,
+                 automaticWeatherStation):
+
         self.stationID = stationID
         self.name = name
         self.latitude = latitude
@@ -78,10 +132,14 @@ class Station:
         self.years = years
         self.percentage = percentage
         self.automaticWeatherStation = automaticWeatherStation
-    
+
     def getLineEntry(self):
-        return(f'{self.stationID},{self.name},{self.latitude},{self.longitude},{self.start},{self.end},{self.years},{self.percentage},{self.automaticWeatherStation}\n')
- 
+        return(f'{self.stationID}, {self.name}, {self.latitude},\
+               + {self.longitude}, {self.start}, {self.end},\
+               + {self.years}, {self.percentage},\
+               + {self.automaticWeatherStation}\n')
+
+
 def getStationList(ObsCode):
     # URL for station list
     url = f"ftp://ftp.bom.gov.au/anon2/home/ncc/metadata/lists_by_element/alpha/alphaAUS_{ObsCode}.txt"
@@ -95,13 +153,14 @@ def getStationList(ObsCode):
     # Filename for the zip data file
     file_name = f"./database/station_lists/station_list_{ObsCode}.txt"
     with urlopen(req) as response, open(file_name, 'wb') as out_file:
-        # Copy zip file 
+        # Copy zip file
         shutil.copyfileobj(response, out_file)
-    
+
     return file_name
 
+
 def parseStationList(filename, ObsCode):
-    # 
+    #
     stationList = StationList(ObsCode)
     with open(filename, 'r') as stationListFile:
         # Get number of stations in list
@@ -112,6 +171,7 @@ def parseStationList(filename, ObsCode):
         for line in stationListFile[4:4+lines]:
             stationList.append(parseStationLine(line))
     return(stationList)
+
 
 def parseStationLine(line):
     line = line.split()
@@ -127,9 +187,12 @@ def parseStationLine(line):
     years = line[n-2]
     percentage = line[n-1]
     automaticWeatherStation = line[n]
-    automaticWeatherStation = (automaticWeatherStation == "Y" or automaticWeatherStation == "y")
-    station = Station(stationID, name, latitude, longitude, start, end, years, percentage, automaticWeatherStation)
+    automaticWeatherStation = (automaticWeatherStation == "Y" or
+                               automaticWeatherStation == "y")
+    station = Station(stationID, name, latitude, longitude, start, end, years,
+                      percentage, automaticWeatherStation)
     return(station)
+
 
 def getNumberStations(stationListFile):
     # Get number of stations in list
@@ -141,41 +204,50 @@ def getNumberStations(stationListFile):
             except ValueError:
                 return(None)
 
+
 def insertStation(session, threadID, rowsToInsert):
     # Get Current Station IDs
     current_Site_IDs = []
     for row in session.execute(select([Station_table.Site])):
         current_Site_IDs.append(row[0])
 
-    for Sitee, row in rowsToInsert.iterrows():
-        rowDB = session.query(Station_table).filter(Station_table.Site == Sitee).first()
-        if rowDB == None:
-            test_Station = Station_table(Site=Sitee, Name=row[0], Lat=row[1], Lon=row[2], Start_date=row[3], End_date=row[4], Years=row[5], Percentage=row[6], AWS=row[7])
+    for Site, row in rowsToInsert.iterrows():
+        rowDB = session.query(Station_table).filter(Station_table.Site == Site).first()
+        if rowDB is None:
+            test_Station = Station_table(Site=Site, Name=row[0], Lat=row[1],
+                                         Lon=row[2], Start_date=row[3],
+                                         End_date=row[4], Years=row[5],
+                                         Percentage=row[6], AWS=row[7])
             session.add(test_Station)
         else:
-            rowDB.Name=row[0]
-            rowDB.Lat=row[1]
-            rowDB.Lon=row[2]
-            rowDB.Start_date=row[3]
-            rowDB.End_date=row[4]
-            rowDB.Years=row[5]
-            rowDB.Percentage=row[6]
-            rowDB.AWS=row[7]
-        session.commit()  
-    
+            rowDB.Name = row[0]
+            rowDB.Lat = row[1]
+            rowDB.Lon = row[2]
+            rowDB.Start_date = row[3]
+            rowDB.End_date = row[4]
+            rowDB.Years = row[5]
+            rowDB.Percentage = row[6]
+            rowDB.AWS = row[7]
+        session.commit()
+
+
 def getRowsNotAlreadyInTable(data_table, current_Site_IDs):
     return data_table.loc[~data_table.index.isin(current_Site_IDs), :]
 
+
 class myThread (threading.Thread):
-   def __init__(self, Session, threadID, rowsToInsert):
-      threading.Thread.__init__(self)
-      self.Session = Session
-      self.threadID = threadID
-      self.rowsToInsert = rowsToInsert
-   def run(self):
-      insertStation(self.Session, self.threadID, self.rowsToInsert)
+    def __init__(self, Session, threadID, rowsToInsert):
+        threading.Thread.__init__(self)
+        self.Session = Session
+        self.threadID = threadID
+        self.rowsToInsert = rowsToInsert
+
+    def run(self):
+        insertStation(self.Session, self.threadID, self.rowsToInsert)
+
 
 def bulkInsertStations(session, rowsToInsert):
+    # TODO: allow numThreads to be passed as a parameter
     numThreads = 80
     threads = []
     rowsToInsert = np.array_split(rowsToInsert, numThreads)
@@ -187,18 +259,16 @@ def bulkInsertStations(session, rowsToInsert):
     print("Uploading Data")
     for i in range(0, numThreads):
         threads[i].start()
-        
+
     for i in range(0, numThreads):
         threads[i].join()
-    
-    print ("Exiting Main Thread")
 
-def updateStationList(nccObsCode):
-    session = connectToDatabaseThreading()
+    print("Exiting Main Thread")
+
+
+def updateStationList(session, nccObsCode):
     file_name = getStationList(nccObsCode)
     stationList = parseStationList(file_name, nccObsCode)
     data_table = stationList.getPD()
     os.remove(file_name)
     bulkInsertStations(session, data_table)
-
-

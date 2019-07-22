@@ -4,13 +4,20 @@ import datetime
 import sqlalchemy
 from geopy import distance
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql import select 
-from api.database_models import connectToDatabase, Station, Rainfall, Solar, Temperature, Location
+from sqlalchemy.sql import select
+from api.database import connectToDatabase
+from api.database_models import Station
+from api.database_models import Rainfall
+from api.database_models import Solar
+from api.database_models import Temperature
+from api.database_models import Location
+
 
 def getData(session, site, type, before_date=None, after_date=None):
     return
 
-def getSitesNear(session, Location, range=25, current=False):    
+
+def getSitesNear(session, Location, range=25, current=False):
     """Get all sites within `range` km from (`Lat`, `Lon`).
 
     Generates list of Sites geographically placed within the desired region.
@@ -24,32 +31,39 @@ def getSitesNear(session, Location, range=25, current=False):
 
     `Lon`: Longitutde, (-180, 180)
 
-    `range`: The range or radius from (`Lat`, `Lon`) to search for Sites in kilometers
+    `range`: The range or radius from (`Lat`, `Lon`) \
+        to search for Sites in kilometers
 
-    `current`: Filter for only current stations (Stations which have not ceased operation).
+    `current`: Filter for only current stations \
+        (Stations which have not ceased operation).
         default: current=True
     """
     results = StationQueryResult(session)
-    for row in session.execute(select([Station.Site, Station.Lat, Station.Lon])):
+    s = select([Station.Site, Station.Lat, Station.Lon])
+    for row in session.execute(s):
         if Location.withinRange(Location(row[1], row[2]), range):
-            results.append(row[0])            
+            results.append(row[0])
     return results
 
 
-def getCurrentSites(session, asOf=None):    
+def getCurrentSites(session, asOf=None):
     """Gets all current Stations (Stations which have not ceased operation).
 
     `session`: sqlAlchemy Session
 
     `asOf`: datetime.datetime of when to check if the Site was current
         default: None, use today's date
-    """   
+    """
     results = StationQueryResult(session)
-    for row in session.execute(select([Station.Site]).where(Station.End_date == "2019-07-01")):
-        results.append(row[0])            
+    # TODO: Change to get current date and not this default
+    # TODO: Accept the usage of asOf parameter
+    s = select([Station.Site]).where(Station.End_date == "2019-07-01")
+    for row in session.execute(s):
+        results.append(row[0])
     return results
 
-def isSiteCurrent(session, asOf=None):    
+
+def isSiteCurrent(session, asOf=None):
     """Checks if site/s are current (Stations which have not ceased operation).
 
     Output attempts to follow a similar format to the datatype of `site`
@@ -60,11 +74,11 @@ def isSiteCurrent(session, asOf=None):
         default: None, use today's date
 
     `site`: input can be type "integer", "dataframe", "dict", "list"
-        integer:    output=boolean 
+        integer:    output=boolean
         dataframe:  output appends a column `column_Title`
         dict:       updates dict such that site[siteID] = isCurrent
         list:       outputs list of tuples [ (siteID, isCurrent), ...]
-    """   
+    """
 
     def isDateEqual(date1, date2):
         """ Checks if two dates are equal. Accepts String or datetime.date
@@ -78,21 +92,23 @@ def isSiteCurrent(session, asOf=None):
     # Get current date to test if current
     now = datetime.datetime.now()
     curr_date = now.strftime("%Y-%m-01")
+    s = select([Station.End_date, Station.Site])
     if isinstance(site, int) or isinstance(site, str):
-        rows = session.execute(select([Station.End_date]).where(Station.Site == site))
+        s = s.where(Station.Site == site)
     elif isinstance(site, list):
         results = []
-        rows = session.execute(select([Station.End_date, Station.Site]).where(Station.Site.in_(site)))
+        s = s.where(Station.Site.in_(site))
     elif isinstance(site, dict):
         results = site
-        rows = session.execute(select([Station.End_date, Station.Site]).where(Station.Site.in_(list(site.keys()))))
+        s = s.where(Station.Site.in_(list(site.keys())))
     elif isinstance(site, pd.DataFrame):
         results = site
         results[column_Title] = False
-        rows = session.execute(select([Station.End_date, Station.Site]).where(Station.Site.in_(list(site['Site']))))
     else:
         print("Could not figure out type")
         return
+
+    rows = session.execute(s)
 
     for row in rows:
 
@@ -101,25 +117,25 @@ def isSiteCurrent(session, asOf=None):
 
         equalDate = isDateEqual(row[0], curr_date)
 
-        if filter and equalDate: 
+        if filter and equalDate:
             if isinstance(site, list):
-                results.append( (row[1], equalDate) )
+                results.append((row[1], equalDate))
             elif isinstance(site, dict):
                 results[row[1]] = equalDate
             elif isinstance(site, pd.DataFrame):
-                results.loc[results['Site']==row[1],column_Title] = equalDate
-        elif filter == False:
+                results.loc[results['Site'] == row[1], column_Title] = equalDate
+        elif filter is False:
             if isinstance(site, list):
-                results.append( (row[1], equalDate) )
+                results.append((row[1], equalDate))
             elif isinstance(site, dict):
                 results[row[1]] = equalDate
             elif isinstance(site, pd.DataFrame):
-                results.loc[results['Site']==row[1],column_Title] = equalDate
+                results.loc[results['Site'] == row[1], column_Title] = equalDate
 
     return results
 
 
-def daysSinceUpdate(session, site, obsType, column_Title="DaysSinceUpdate"):    
+def daysSinceUpdate(session, site, obsType, column_Title="DaysSinceUpdate"):
     """Checks how how many days since Station had its last record.
 
     Output attempts to follow a similar format to the datatype of `site`
@@ -129,10 +145,10 @@ def daysSinceUpdate(session, site, obsType, column_Title="DaysSinceUpdate"):
     `obsType`: Type of observation. Can be 'Temperature', 'Solar', 'Rainfall'
 
     `site`: input can be type "integer", "dataframe", "dict", "list"
-        integer:    output boolean 
+        integer:    output boolean
         dataframe:  output appends a column `column_Title`
         dict:       updates dict such that site[siteID] = isCurrent
         list:       outputs list of tuples [ (siteID, isCurrent), ...]
-    """   
+    """
 
     return
