@@ -5,8 +5,7 @@ import sqlalchemy
 from geopy import distance
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import select 
-from database_models import connectToDatabase, Station, Rainfall, Solar, Temperature
-from queryModels import StationQueryResult, Location
+from api.database_models import connectToDatabase, Station, Rainfall, Solar, Temperature, Location
 
 def getData(session, site, type, before_date=None, after_date=None):
     return
@@ -30,7 +29,7 @@ def getSitesNear(session, Location, range=25, current=False):
     `current`: Filter for only current stations (Stations which have not ceased operation).
         default: current=True
     """
-    results = StationQueryResult()
+    results = StationQueryResult(session)
     for row in session.execute(select([Station.Site, Station.Lat, Station.Lon])):
         if Location.withinRange(Location(row[1], row[2]), range):
             results.append(row[0])            
@@ -45,7 +44,7 @@ def getCurrentSites(session, asOf=None):
     `asOf`: datetime.datetime of when to check if the Site was current
         default: None, use today's date
     """   
-    results = StationQueryResult()
+    results = StationQueryResult(session)
     for row in session.execute(select([Station.Site]).where(Station.End_date == "2019-07-01")):
         results.append(row[0])            
     return results
@@ -137,11 +136,3 @@ def daysSinceUpdate(session, site, obsType, column_Title="DaysSinceUpdate"):
     """   
 
     return
-
-if __name__ == "__main__":
-    conn_engine = connectToDatabase()
-    Session = sessionmaker(bind=conn_engine)
-    session = Session()
-    #results = getSitesNear(session, Location(-27.4698, 153.0251), range=25)
-    results = getCurrentSites(session)
-    print(results.Stations)

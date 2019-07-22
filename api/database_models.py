@@ -1,11 +1,23 @@
 from sqlalchemy import Table, Column, Integer, String, Date, Boolean, Float, MetaData, create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 import sqlalchemy
 import os 
+from geopy import distance
 
 Base = declarative_base()
 meta = MetaData()
 
+
+class Location:
+    def __init__(self, lat, lon):
+        ''' Constructor '''
+        self.lat = lat
+        self.lon = lon
+    
+    def withinRange(self, l, range):
+        return distance.distance((self.lat, self.lon), (l.lat, l.lon)).km < range
 
 class Station(Base):
     __tablename__ = 'station'
@@ -59,6 +71,23 @@ class Temperature(Base):
     def __repr__(self):
        return "<Station(Site='%s', Date='%s', Temperature='%s', Period='%s', Quality='%s')>" % (self.Site, self.Date, self.Temperature, self.Period, self.Quality)
 
+def connectToDatabaseThreading():
+    server = 'bomweatherdata.database.windows.net'
+    database = 'Weather_Data'
+    username = os.environ['BOM_RAINFALL_USERNAME']
+    password = os.environ['BOM_RAINFALL_PASSWORD']
+    driver= 'ODBC Driver 17 for SQL Server'  
+
+    connection_string = f"mssql+pyodbc://{username}:{password}@{server}:1433/{database}?driver={driver}"
+    #print(connection_string)
+    engine = sqlalchemy.engine.create_engine(connection_string, pool_size=128)
+    engine.connect()
+    session_factory = sessionmaker(bind=engine)
+    Session = scoped_session(session_factory)
+    return Session
+
+   
+
 def connectToDatabase():
     server = 'bomweatherdata.database.windows.net'
     database = 'Weather_Data'
@@ -70,7 +99,9 @@ def connectToDatabase():
     #print(connection_string)
     engine = sqlalchemy.engine.create_engine(connection_string, pool_size=128)
     engine.connect()
-    return engine
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    return session
 
 
 def initTables():  
