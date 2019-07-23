@@ -1,1 +1,1 @@
-from scraper import data_scraper
+from BOM_Weather_Data.scraper import data_scraper

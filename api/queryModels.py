@@ -1,11 +1,11 @@
 import numpy as np
-from api.database import connectToDatabase
-from api.database import connectToDatabaseThreading
-from api.database_models import Solar
-from api.database_models import Temperature
-from api.database_models import Location
-from api.database_models import Station as Station_model
-from api.database_models import Rainfall as Rainfall_model
+from BOM_Weather_Data.api.database import connectToDatabase
+from BOM_Weather_Data.api.database import connectToDatabaseThreading
+from BOM_Weather_Data.api.database_models import Solar
+from BOM_Weather_Data.api.database_models import Temperature
+from BOM_Weather_Data.api.database_models import Location
+from BOM_Weather_Data.api.database_models import Station as Station_model
+from BOM_Weather_Data.api.database_models import Rainfall as Rainfall_model
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import scoped_session
 from sqlalchemy.sql import select
@@ -28,7 +28,7 @@ class RainfallQueryResult:
         if row[0] not in self.data.keys():
             self.data[row[0]] = {}
 
-        self.data[row[0]][row[1]] = row[2]
+        self.data[row[0]][row[1].strftime("%Y-%m-%d")] = row[2]
 
     def getRainfall(self, stationList, startDate=None, endDate=None):
 
@@ -74,7 +74,7 @@ class StationQueryResult:
                     print(f"{key} = {value}")
             return self
         return method
-
+    
     def filter(self, **kwargs):
         kwargs = {k.lower(): v for k, v in kwargs.items()}
         # Filter by current
@@ -128,5 +128,22 @@ def getCurrentSites(session, asOf=None):
     """
     results = StationQueryResult(session)
     for row in session.execute(select([Station_model.Site])):
+        results.append(row[0])
+    return results
+
+
+def getSites(session, Stations):
+    """Gets all current Stations (Stations which have not ceased operation).
+
+    `session`: sqlAlchemy Session
+
+    `asOf`: datetime.datetime of when to check if the Site was current
+        default: None, use today's date
+    """
+    results = StationQueryResult(session)
+    print(type(Stations))
+    s = select([Station_model.Site]).where(Station_model.Site.in_(Stations))
+    for row in session.execute(s):
+        print(row)
         results.append(row[0])
     return results

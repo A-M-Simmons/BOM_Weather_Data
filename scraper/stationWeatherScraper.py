@@ -9,9 +9,9 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import scoped_session
 from sqlalchemy.sql import select
 import threading
-from scraper.extractZip import extractZip
+from BOM_Weather_Data.scraper.extractZip import extractZip
 
-from api.database_models import Rainfall as Rainfall_table
+from BOM_Weather_Data.api.database_models import Rainfall as Rainfall_table
 
 
 def getPC(stationID, ObsCode):

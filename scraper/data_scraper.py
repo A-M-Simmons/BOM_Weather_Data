@@ -5,7 +5,7 @@ from multiprocessing import TimeoutError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import scoped_session
 from sqlalchemy.sql import select
-from api.database_models import Station as Station_table
+from BOM_Weather_Data.api.database_models import Station as Station_table
 from io import BytesIO
 import requests
 import shutil
@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 import threading
 
-from api import connectToDatabaseThreading
+from BOM_Weather_Data.api import connectToDatabaseThreading
 
 
 def convertDate(date):
