@@ -19,7 +19,7 @@ itsdangerous==1.1.0
 Jinja2==2.10.1
 louis==3.5.0
 macaroonbakery==1.1.3
-Mako==1.0.7
+Mako==1.2.2
 MarkupSafe==1.1.1
 numpy==1.16.4
 onboard==1.4.1
